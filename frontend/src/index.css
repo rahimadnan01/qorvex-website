@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #FFFFFF;
+    color: #0F172A;
+    overflow-x: hidden;
+    cursor: default;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  html.dark body {
+    background-color: #0B111E;
+    color: #FFFFFF;
+  }
+
+  input, textarea, select {
+    color: inherit;
+  }
+}
+
+/* Fix browser input autofill text visibility in light and dark mode */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0F172A !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill,
+.dark textarea:-webkit-autofill:hover,
+.dark textarea:-webkit-autofill:focus,
+.dark select:-webkit-autofill,
+.dark select:-webkit-autofill:hover,
+.dark select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #FFFFFF !important;
+  -webkit-box-shadow: 0 0 0px 1000px #152436 inset !important;
+}
+
+/* Explicit Admin Field & Text Visibility Rules for Light & Dark Mode */
+.admin-input-field {
+  background-color: #F1F5F9 !important;
+  color: #020617 !important;
+  border: 2px solid #CBD5E1 !important;
+  font-weight: 700 !important;
+}
+
+.admin-input-field::placeholder {
+  color: #64748B !important;
+  font-weight: 500 !important;
+}
+
+html.dark .admin-input-field {
+  background-color: #0F172A !important;
+  color: #FFFFFF !important;
+  border: 2px solid #334155 !important;
+  font-weight: 600 !important;
+}
+
+html.dark .admin-input-field::placeholder {
+  color: #94A3B8 !important;
+  font-weight: 400 !important;
+}
+
+.admin-card-bg {
+  background-color: #FFFFFF !important;
+  color: #020617 !important;
+  border: 1px solid #E2E8F0 !important;
+}
+
+html.dark .admin-card-bg {
+  background-color: #152436 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #2A3F55 !important;
+}
+
+/* Custom Noise Grain Overlay */
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F5F7F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #152436;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0D98A2;
+}
+
+/* Glassmorphism utilities */
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(21, 36, 54, 0.12);
+}
+
+.glass-card-navy {
+  background: #152436;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-card-navy:hover {
+  border-color: #0D98A2;
+  box-shadow: 0 12px 35px -10px rgba(13, 152, 162, 0.35);
+}
+
+.glass-card-light {
+  background: #FFFFFF;
+  color: #0F172A;
+  border: 1px solid rgba(21, 36, 54, 0.12);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-card-light:hover {
+  border-color: #0D98A2;
+  box-shadow: 0 12px 35px -10px rgba(21, 36, 54, 0.15);
+}
+
+/* Text Gradients */
+.text-gradient-navy {
+  background: linear-gradient(135deg, #152436 0%, #0D98A2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-teal {
+  background: linear-gradient(135deg, #0D98A2 0%, #0A7880 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  {/* Octagonal Q Frame in #152436 */}
+  <path
+    d="M 32,10 L 68,10 L 90,32 L 90,68 L 68,90 L 32,90 L 10,68 L 10,32 Z
+       M 34,30 L 30,34 L 30,62 L 34,66 L 52,66 L 40,50 L 58,50 L 66,60 L 70,60 L 70,34 L 66,30 Z"
+    fill="#152436"
+    fill-rule="evenodd"
+  />
+  {/* Slanted Teal Slash Tail in #0D98A2 */}
+  <path
+    d="M 44,54 L 75,54 L 96,82 L 65,82 Z"
+    fill="#0D98A2"
+  />
+</svg>
