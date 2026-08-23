@@ -1,6 +1,6 @@
 # Qorvex — Next-Gen Software • Design • SEO Studio Website
 
-A premium, Awwwards-tier marketing website built for **Qorvex**, built with the **MERN Stack (MongoDB, Express, React + Vite, Node.js)**.
+A premium, Awwwards-tier marketing website built for **Qorvex**, built with the **MERN Stack (MongoDB, Express, React + Vite, Node.js)** and configured for full-stack Vercel deployment.
 
 ## Key Features
 
