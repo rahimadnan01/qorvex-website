@@ -80,14 +80,16 @@ To update Team Members, Services, or Projects without touching code:
 
 ## 🌐 Deployment Instructions
 
-### Deployment to Vercel (Frontend)
-1. Push `frontend/` to GitHub.
-2. Import project in [Vercel](https://vercel.com).
-3. Set root directory to `frontend`.
-4. Add Environment Variable:
+### Deployment to Vercel (Full-Stack Frontend + API)
+1. Push the entire project repository to GitHub.
+2. Import the project in [Vercel](https://vercel.com).
+3. Keep **Root Directory** as `.` (leave default / blank). Vercel will automatically read `vercel.json`.
+4. (Optional) Add Environment Variables in Vercel Project Settings:
    ```env
-   VITE_API_URL=https://your-backend.onrender.com/api
+   MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/qorvex_db?retryWrites=true&w=majority
+   JWT_SECRET=your_jwt_secret_here
    ```
+5. Click **Deploy**. Both the Vite React Frontend and Express `/api` endpoints (including Admin Login) will work out of the box!
 
 ### Deployment to Render (Backend)
 1. Push `backend/` to GitHub / Render Web Service.
