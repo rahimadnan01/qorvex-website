@@ -1,6 +1,6 @@
 import { Service, TeamMember, Project, Testimonial, ContactFormData } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || '/api';
 
 // Default fallbacks in case API server is starting or disconnected
 const fallbackServices: Service[] = [
