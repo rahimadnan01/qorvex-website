@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Service from '../models/Service.js';
 import { getIsConnected } from '../config/db.js';
 import { defaultServices } from '../data/defaultData.js';
@@ -7,10 +8,26 @@ import { protect } from '../middleware/auth.js';
 const router = express.Router();
 let memoryServices = [...defaultServices];
 
+const autoSeedServices = async () => {
+  if (getIsConnected()) {
+    try {
+      const count = await Service.countDocuments();
+      if (count === 0) {
+        console.log('[AUTO-SEED] Seeding default services into MongoDB...');
+        const cleanToInsert = defaultServices.map(({ _id, ...rest }) => rest);
+        await Service.insertMany(cleanToInsert);
+      }
+    } catch (e) {
+      console.warn('[AUTO-SEED SERVICES ERROR]', e.message);
+    }
+  }
+};
+
 // GET /api/services
 router.get('/', async (req, res) => {
   try {
     if (getIsConnected()) {
+      await autoSeedServices();
       const services = await Service.find().sort({ order: 1 });
       if (services.length > 0) return res.json(services);
     }
@@ -25,7 +42,7 @@ router.post('/', protect, async (req, res) => {
   try {
     const serviceData = { ...req.body };
     delete serviceData._id;
-    if (!serviceData.slug) {
+    if (!serviceData.slug && serviceData.title) {
       serviceData.slug = serviceData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     }
     if (getIsConnected()) {
@@ -54,8 +71,11 @@ router.put('/:id', protect, async (req, res) => {
 
     if (getIsConnected()) {
       let updated = null;
-      if (id && id.length === 24) {
+      if (id && mongoose.Types.ObjectId.isValid(id)) {
         updated = await Service.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+      }
+      if (!updated && updateData.slug) {
+        updated = await Service.findOneAndUpdate({ slug: updateData.slug }, updateData, { new: true });
       }
       if (!updated) {
         const newSrv = new Service(updateData);
@@ -65,10 +85,7 @@ router.put('/:id', protect, async (req, res) => {
       return res.json(updated);
     }
 
-    let idx = memoryServices.findIndex(s => s._id === id);
-    if (idx === -1 && memoryServices.length > 0) {
-      idx = 0;
-    }
+    let idx = memoryServices.findIndex(s => s._id === id || s.slug === id);
     if (idx !== -1) {
       memoryServices[idx] = { ...memoryServices[idx], ...updateData, _id: id };
       return res.json(memoryServices[idx]);
@@ -87,9 +104,13 @@ router.delete('/:id', protect, async (req, res) => {
   try {
     const { id } = req.params;
     if (getIsConnected()) {
-      await Service.findByIdAndDelete(id);
+      if (id && mongoose.Types.ObjectId.isValid(id)) {
+        await Service.findByIdAndDelete(id);
+      } else {
+        await Service.findOneAndDelete({ $or: [{ slug: id }, { _id: id }] }).catch(() => {});
+      }
     }
-    memoryServices = memoryServices.filter(s => s._id !== id);
+    memoryServices = memoryServices.filter(s => s._id !== id && s.slug !== id);
     res.json({ message: 'Service deleted successfully' });
   } catch (err) {
     console.error('[SERVICES DELETE ERROR]', err);

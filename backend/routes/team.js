@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import TeamMember from '../models/TeamMember.js';
 import { getIsConnected } from '../config/db.js';
 import { defaultTeam } from '../data/defaultData.js';
@@ -7,10 +8,26 @@ import { protect } from '../middleware/auth.js';
 const router = express.Router();
 let memoryTeam = [...defaultTeam];
 
+const autoSeedTeam = async () => {
+  if (getIsConnected()) {
+    try {
+      const count = await TeamMember.countDocuments();
+      if (count === 0) {
+        console.log('[AUTO-SEED] Seeding default team members into MongoDB...');
+        const cleanToInsert = defaultTeam.map(({ _id, ...rest }) => rest);
+        await TeamMember.insertMany(cleanToInsert);
+      }
+    } catch (e) {
+      console.warn('[AUTO-SEED TEAM ERROR]', e.message);
+    }
+  }
+};
+
 // GET /api/team
 router.get('/', async (req, res) => {
   try {
     if (getIsConnected()) {
+      await autoSeedTeam();
       const team = await TeamMember.find().sort({ order: 1 });
       if (team.length > 0) return res.json(team);
     }
@@ -51,8 +68,11 @@ router.put('/:id', protect, async (req, res) => {
 
     if (getIsConnected()) {
       let updated = null;
-      if (id && id.length === 24) {
+      if (id && mongoose.Types.ObjectId.isValid(id)) {
         updated = await TeamMember.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+      }
+      if (!updated && updateData.name) {
+        updated = await TeamMember.findOneAndUpdate({ name: updateData.name }, updateData, { new: true });
       }
       if (!updated) {
         const newMember = new TeamMember(updateData);
@@ -62,10 +82,7 @@ router.put('/:id', protect, async (req, res) => {
       return res.json(updated);
     }
 
-    let idx = memoryTeam.findIndex(t => t._id === id);
-    if (idx === -1 && memoryTeam.length > 0) {
-      idx = 0;
-    }
+    let idx = memoryTeam.findIndex(t => t._id === id || t.name === updateData.name);
     if (idx !== -1) {
       memoryTeam[idx] = { ...memoryTeam[idx], ...updateData, _id: id };
       return res.json(memoryTeam[idx]);
@@ -84,7 +101,11 @@ router.delete('/:id', protect, async (req, res) => {
   try {
     const { id } = req.params;
     if (getIsConnected()) {
-      await TeamMember.findByIdAndDelete(id);
+      if (id && mongoose.Types.ObjectId.isValid(id)) {
+        await TeamMember.findByIdAndDelete(id);
+      } else {
+        await TeamMember.findOneAndDelete({ _id: id }).catch(() => {});
+      }
     }
     memoryTeam = memoryTeam.filter(t => t._id !== id);
     res.json({ message: 'Team member deleted successfully' });

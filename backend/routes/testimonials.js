@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Testimonial from '../models/Testimonial.js';
 import { getIsConnected } from '../config/db.js';
 import { defaultTestimonials } from '../data/defaultData.js';
@@ -7,10 +8,26 @@ import { protect } from '../middleware/auth.js';
 const router = express.Router();
 let memoryTestimonials = [...defaultTestimonials];
 
+const autoSeedTestimonials = async () => {
+  if (getIsConnected()) {
+    try {
+      const count = await Testimonial.countDocuments();
+      if (count === 0) {
+        console.log('[AUTO-SEED] Seeding default testimonials into MongoDB...');
+        const cleanToInsert = defaultTestimonials.map(({ _id, ...rest }) => rest);
+        await Testimonial.insertMany(cleanToInsert);
+      }
+    } catch (e) {
+      console.warn('[AUTO-SEED TESTIMONIALS ERROR]', e.message);
+    }
+  }
+};
+
 // GET /api/testimonials
 router.get('/', async (req, res) => {
   try {
     if (getIsConnected()) {
+      await autoSeedTestimonials();
       const testimonials = await Testimonial.find().sort({ order: 1 });
       if (testimonials.length > 0) return res.json(testimonials);
     }
@@ -51,8 +68,11 @@ router.put('/:id', protect, async (req, res) => {
 
     if (getIsConnected()) {
       let updated = null;
-      if (id && id.length === 24) {
+      if (id && mongoose.Types.ObjectId.isValid(id)) {
         updated = await Testimonial.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+      }
+      if (!updated && updateData.author) {
+        updated = await Testimonial.findOneAndUpdate({ author: updateData.author }, updateData, { new: true });
       }
       if (!updated) {
         const newTst = new Testimonial(updateData);
@@ -62,10 +82,7 @@ router.put('/:id', protect, async (req, res) => {
       return res.json(updated);
     }
 
-    let idx = memoryTestimonials.findIndex(t => t._id === id);
-    if (idx === -1 && memoryTestimonials.length > 0) {
-      idx = 0;
-    }
+    let idx = memoryTestimonials.findIndex(t => t._id === id || t.author === updateData.author);
     if (idx !== -1) {
       memoryTestimonials[idx] = { ...memoryTestimonials[idx], ...updateData, _id: id };
       return res.json(memoryTestimonials[idx]);
@@ -84,7 +101,11 @@ router.delete('/:id', protect, async (req, res) => {
   try {
     const { id } = req.params;
     if (getIsConnected()) {
-      await Testimonial.findByIdAndDelete(id);
+      if (id && mongoose.Types.ObjectId.isValid(id)) {
+        await Testimonial.findByIdAndDelete(id);
+      } else {
+        await Testimonial.findOneAndDelete({ _id: id }).catch(() => {});
+      }
     }
     memoryTestimonials = memoryTestimonials.filter(t => t._id !== id);
     res.json({ message: 'Testimonial deleted successfully' });

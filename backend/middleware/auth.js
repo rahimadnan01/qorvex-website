@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import { getIsConnected } from '../config/db.js';
 
@@ -15,9 +16,16 @@ export const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, jwtSecret);
 
       if (getIsConnected()) {
-        req.user = await User.findById(decoded.id).select('-password');
-      } else {
-        // Fallback for memory mode
+        try {
+          if (decoded.id && mongoose.Types.ObjectId.isValid(decoded.id)) {
+            req.user = await User.findById(decoded.id).select('-password');
+          }
+        } catch (e) {
+          // Ignore ObjectId cast error for fallback admin user
+        }
+      }
+
+      if (!req.user) {
         req.user = { id: decoded.id, email: decoded.email, role: decoded.role || 'admin' };
       }
 

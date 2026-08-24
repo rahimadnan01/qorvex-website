@@ -17,16 +17,22 @@ export const connectDB = async () => {
     return;
   }
 
-  const connUri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/qorvex_db';
+  const connUri = process.env.MONGODB_URI;
+  if (!connUri) {
+    isConnected = false;
+    console.log('[QORVEX DB] No MONGODB_URI provided. Operating in dynamic memory mode.');
+    return;
+  }
+
   try {
     const conn = await mongoose.connect(connUri, {
-      serverSelectionTimeoutMS: 15000,
+      serverSelectionTimeoutMS: 5000,
     });
     isConnected = true;
     console.log(`[QORVEX DB] MongoDB Atlas Connected: ${conn.connection.host}`);
   } catch (error) {
     isConnected = false;
-    console.warn(`[QORVEX DB] MongoDB connection warning (${error.message}). Operating with dynamic memory cache fallback.`);
+    console.warn(`[QORVEX DB] MongoDB connection warning (${error.message}). Operating with dynamic memory mode.`);
   }
 };
 
