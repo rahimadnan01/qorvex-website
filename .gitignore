@@ -8,8 +8,6 @@ dist/
 build/
 
 # Environment files
-.env
-.env.local
 .env.development.local
 .env.production.local
 **/backend/.env
@@ -23,5 +21,5 @@ yarn-debug.log*
 # OS & Editor files
 .DS_Store
 Thumbs.db
-.vscode/
 .idea/
+config.bat
