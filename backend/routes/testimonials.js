@@ -67,24 +67,36 @@ router.put('/:id', protect, async (req, res) => {
     delete updateData.__v;
 
     if (getIsConnected()) {
-      let updated = null;
       if (id && mongoose.Types.ObjectId.isValid(id)) {
-        updated = await Testimonial.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+        const updated = await Testimonial.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+        if (updated) return res.json(updated);
       }
-      if (!updated && updateData.author) {
-        updated = await Testimonial.findOneAndUpdate({ author: updateData.author }, updateData, { new: true });
+
+      // Handle legacy 'tst_1', 'tst_2' IDs in MongoDB
+      if (typeof id === 'string' && id.startsWith('tst_')) {
+        const numIdx = parseInt(id.replace('tst_', ''), 10) - 1;
+        if (!isNaN(numIdx) && numIdx >= 0) {
+          const allDocs = await Testimonial.find().sort({ order: 1, _id: 1 });
+          if (allDocs[numIdx]) {
+            const updated = await Testimonial.findByIdAndUpdate(allDocs[numIdx]._id, updateData, { new: true, runValidators: false });
+            return res.json(updated);
+          }
+        }
       }
-      if (!updated) {
-        const newTst = new Testimonial(updateData);
-        await newTst.save();
-        return res.json(newTst);
-      }
-      return res.json(updated);
+
+      const newTst = new Testimonial(updateData);
+      await newTst.save();
+      return res.json(newTst);
     }
 
-    let idx = memoryTestimonials.findIndex(t => t._id === id || t.author === updateData.author);
+    // In Memory Mode
+    let idx = memoryTestimonials.findIndex(t => t._id === id);
+    if (idx === -1 && typeof id === 'string' && id.startsWith('tst_')) {
+      const numIdx = parseInt(id.replace('tst_', ''), 10) - 1;
+      if (numIdx >= 0 && numIdx < memoryTestimonials.length) idx = numIdx;
+    }
     if (idx !== -1) {
-      memoryTestimonials[idx] = { ...memoryTestimonials[idx], ...updateData, _id: id };
+      memoryTestimonials[idx] = { ...memoryTestimonials[idx], ...updateData, _id: memoryTestimonials[idx]._id || id };
       return res.json(memoryTestimonials[idx]);
     }
     const fallbackTestimonial = { ...updateData, _id: id || ('tst_' + Date.now()) };
@@ -103,11 +115,25 @@ router.delete('/:id', protect, async (req, res) => {
     if (getIsConnected()) {
       if (id && mongoose.Types.ObjectId.isValid(id)) {
         await Testimonial.findByIdAndDelete(id);
-      } else {
-        await Testimonial.findOneAndDelete({ _id: id }).catch(() => {});
+      } else if (typeof id === 'string' && id.startsWith('tst_')) {
+        const numIdx = parseInt(id.replace('tst_', ''), 10) - 1;
+        if (!isNaN(numIdx) && numIdx >= 0) {
+          const allDocs = await Testimonial.find().sort({ order: 1, _id: 1 });
+          if (allDocs[numIdx]) {
+            await Testimonial.findByIdAndDelete(allDocs[numIdx]._id);
+          }
+        }
       }
     }
-    memoryTestimonials = memoryTestimonials.filter(t => t._id !== id);
+
+    let memoryIdx = memoryTestimonials.findIndex(t => t._id === id);
+    if (memoryIdx === -1 && typeof id === 'string' && id.startsWith('tst_')) {
+      const numIdx = parseInt(id.replace('tst_', ''), 10) - 1;
+      if (numIdx >= 0 && numIdx < memoryTestimonials.length) memoryIdx = numIdx;
+    }
+    if (memoryIdx !== -1) {
+      memoryTestimonials.splice(memoryIdx, 1);
+    }
     res.json({ message: 'Testimonial deleted successfully' });
   } catch (err) {
     console.error('[TESTIMONIALS DELETE ERROR]', err);

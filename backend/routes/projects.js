@@ -93,24 +93,41 @@ router.put('/:id', protect, async (req, res) => {
     delete updateData.__v;
 
     if (getIsConnected()) {
-      let updated = null;
       if (id && mongoose.Types.ObjectId.isValid(id)) {
-        updated = await Project.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+        const updated = await Project.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+        if (updated) return res.json(updated);
       }
-      if (!updated && updateData.slug) {
-        updated = await Project.findOneAndUpdate({ slug: updateData.slug }, updateData, { new: true });
+
+      // Handle legacy 'proj_1', 'proj_2' IDs in MongoDB
+      if (typeof id === 'string' && id.startsWith('proj_')) {
+        const numIdx = parseInt(id.replace('proj_', ''), 10) - 1;
+        if (!isNaN(numIdx) && numIdx >= 0) {
+          const allDocs = await Project.find().sort({ order: 1, _id: 1 });
+          if (allDocs[numIdx]) {
+            const updated = await Project.findByIdAndUpdate(allDocs[numIdx]._id, updateData, { new: true, runValidators: false });
+            return res.json(updated);
+          }
+        }
       }
-      if (!updated) {
-        const newProj = new Project(updateData);
-        await newProj.save();
-        return res.json(newProj);
+
+      if (updateData.slug) {
+        const updated = await Project.findOneAndUpdate({ slug: updateData.slug }, updateData, { new: true });
+        if (updated) return res.json(updated);
       }
-      return res.json(updated);
+
+      const newProj = new Project(updateData);
+      await newProj.save();
+      return res.json(newProj);
     }
 
-    let idx = memoryProjects.findIndex(p => p._id === id || p.slug === id);
+    // In Memory Mode
+    let idx = memoryProjects.findIndex(p => p._id === id || p.slug === updateData.slug);
+    if (idx === -1 && typeof id === 'string' && id.startsWith('proj_')) {
+      const numIdx = parseInt(id.replace('proj_', ''), 10) - 1;
+      if (numIdx >= 0 && numIdx < memoryProjects.length) idx = numIdx;
+    }
     if (idx !== -1) {
-      memoryProjects[idx] = { ...memoryProjects[idx], ...updateData, _id: id };
+      memoryProjects[idx] = { ...memoryProjects[idx], ...updateData, _id: memoryProjects[idx]._id || id };
       return res.json(memoryProjects[idx]);
     }
     const fallbackProj = { ...updateData, _id: id || ('proj_' + Date.now()) };
@@ -129,11 +146,25 @@ router.delete('/:id', protect, async (req, res) => {
     if (getIsConnected()) {
       if (id && mongoose.Types.ObjectId.isValid(id)) {
         await Project.findByIdAndDelete(id);
-      } else {
-        await Project.findOneAndDelete({ $or: [{ slug: id }, { _id: id }] }).catch(() => {});
+      } else if (typeof id === 'string' && id.startsWith('proj_')) {
+        const numIdx = parseInt(id.replace('proj_', ''), 10) - 1;
+        if (!isNaN(numIdx) && numIdx >= 0) {
+          const allDocs = await Project.find().sort({ order: 1, _id: 1 });
+          if (allDocs[numIdx]) {
+            await Project.findByIdAndDelete(allDocs[numIdx]._id);
+          }
+        }
       }
     }
-    memoryProjects = memoryProjects.filter(p => p._id !== id && p.slug !== id);
+
+    let memoryIdx = memoryProjects.findIndex(p => p._id === id);
+    if (memoryIdx === -1 && typeof id === 'string' && id.startsWith('proj_')) {
+      const numIdx = parseInt(id.replace('proj_', ''), 10) - 1;
+      if (numIdx >= 0 && numIdx < memoryProjects.length) memoryIdx = numIdx;
+    }
+    if (memoryIdx !== -1) {
+      memoryProjects.splice(memoryIdx, 1);
+    }
     res.json({ message: 'Project deleted successfully' });
   } catch (err) {
     console.error('[PROJECTS DELETE ERROR]', err);

@@ -70,24 +70,41 @@ router.put('/:id', protect, async (req, res) => {
     delete updateData.__v;
 
     if (getIsConnected()) {
-      let updated = null;
       if (id && mongoose.Types.ObjectId.isValid(id)) {
-        updated = await Service.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+        const updated = await Service.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+        if (updated) return res.json(updated);
       }
-      if (!updated && updateData.slug) {
-        updated = await Service.findOneAndUpdate({ slug: updateData.slug }, updateData, { new: true });
+
+      // Handle legacy 'srv_1', 'srv_2' IDs in MongoDB
+      if (typeof id === 'string' && id.startsWith('srv_')) {
+        const numIdx = parseInt(id.replace('srv_', ''), 10) - 1;
+        if (!isNaN(numIdx) && numIdx >= 0) {
+          const allDocs = await Service.find().sort({ order: 1, _id: 1 });
+          if (allDocs[numIdx]) {
+            const updated = await Service.findByIdAndUpdate(allDocs[numIdx]._id, updateData, { new: true, runValidators: false });
+            return res.json(updated);
+          }
+        }
       }
-      if (!updated) {
-        const newSrv = new Service(updateData);
-        await newSrv.save();
-        return res.json(newSrv);
+
+      if (updateData.slug) {
+        const updated = await Service.findOneAndUpdate({ slug: updateData.slug }, updateData, { new: true });
+        if (updated) return res.json(updated);
       }
-      return res.json(updated);
+
+      const newSrv = new Service(updateData);
+      await newSrv.save();
+      return res.json(newSrv);
     }
 
-    let idx = memoryServices.findIndex(s => s._id === id || s.slug === id);
+    // In Memory Mode
+    let idx = memoryServices.findIndex(s => s._id === id || s.slug === updateData.slug);
+    if (idx === -1 && typeof id === 'string' && id.startsWith('srv_')) {
+      const numIdx = parseInt(id.replace('srv_', ''), 10) - 1;
+      if (numIdx >= 0 && numIdx < memoryServices.length) idx = numIdx;
+    }
     if (idx !== -1) {
-      memoryServices[idx] = { ...memoryServices[idx], ...updateData, _id: id };
+      memoryServices[idx] = { ...memoryServices[idx], ...updateData, _id: memoryServices[idx]._id || id };
       return res.json(memoryServices[idx]);
     }
     const fallbackService = { ...updateData, _id: id || ('srv_' + Date.now()) };
@@ -106,11 +123,25 @@ router.delete('/:id', protect, async (req, res) => {
     if (getIsConnected()) {
       if (id && mongoose.Types.ObjectId.isValid(id)) {
         await Service.findByIdAndDelete(id);
-      } else {
-        await Service.findOneAndDelete({ $or: [{ slug: id }, { _id: id }] }).catch(() => {});
+      } else if (typeof id === 'string' && id.startsWith('srv_')) {
+        const numIdx = parseInt(id.replace('srv_', ''), 10) - 1;
+        if (!isNaN(numIdx) && numIdx >= 0) {
+          const allDocs = await Service.find().sort({ order: 1, _id: 1 });
+          if (allDocs[numIdx]) {
+            await Service.findByIdAndDelete(allDocs[numIdx]._id);
+          }
+        }
       }
     }
-    memoryServices = memoryServices.filter(s => s._id !== id && s.slug !== id);
+
+    let memoryIdx = memoryServices.findIndex(s => s._id === id);
+    if (memoryIdx === -1 && typeof id === 'string' && id.startsWith('srv_')) {
+      const numIdx = parseInt(id.replace('srv_', ''), 10) - 1;
+      if (numIdx >= 0 && numIdx < memoryServices.length) memoryIdx = numIdx;
+    }
+    if (memoryIdx !== -1) {
+      memoryServices.splice(memoryIdx, 1);
+    }
     res.json({ message: 'Service deleted successfully' });
   } catch (err) {
     console.error('[SERVICES DELETE ERROR]', err);

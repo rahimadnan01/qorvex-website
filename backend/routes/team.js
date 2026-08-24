@@ -67,24 +67,36 @@ router.put('/:id', protect, async (req, res) => {
     delete updateData.__v;
 
     if (getIsConnected()) {
-      let updated = null;
       if (id && mongoose.Types.ObjectId.isValid(id)) {
-        updated = await TeamMember.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+        const updated = await TeamMember.findByIdAndUpdate(id, updateData, { new: true, runValidators: false });
+        if (updated) return res.json(updated);
       }
-      if (!updated && updateData.name) {
-        updated = await TeamMember.findOneAndUpdate({ name: updateData.name }, updateData, { new: true });
+
+      // Handle legacy 'tm_1', 'tm_2' IDs in MongoDB
+      if (typeof id === 'string' && id.startsWith('tm_')) {
+        const numIdx = parseInt(id.replace('tm_', ''), 10) - 1;
+        if (!isNaN(numIdx) && numIdx >= 0) {
+          const allDocs = await TeamMember.find().sort({ order: 1, _id: 1 });
+          if (allDocs[numIdx]) {
+            const updated = await TeamMember.findByIdAndUpdate(allDocs[numIdx]._id, updateData, { new: true, runValidators: false });
+            return res.json(updated);
+          }
+        }
       }
-      if (!updated) {
-        const newMember = new TeamMember(updateData);
-        await newMember.save();
-        return res.json(newMember);
-      }
-      return res.json(updated);
+
+      const newMember = new TeamMember(updateData);
+      await newMember.save();
+      return res.json(newMember);
     }
 
-    let idx = memoryTeam.findIndex(t => t._id === id || t.name === updateData.name);
+    // In Memory Mode
+    let idx = memoryTeam.findIndex(t => t._id === id);
+    if (idx === -1 && typeof id === 'string' && id.startsWith('tm_')) {
+      const numIdx = parseInt(id.replace('tm_', ''), 10) - 1;
+      if (numIdx >= 0 && numIdx < memoryTeam.length) idx = numIdx;
+    }
     if (idx !== -1) {
-      memoryTeam[idx] = { ...memoryTeam[idx], ...updateData, _id: id };
+      memoryTeam[idx] = { ...memoryTeam[idx], ...updateData, _id: memoryTeam[idx]._id || id };
       return res.json(memoryTeam[idx]);
     }
     const fallbackMember = { ...updateData, _id: id || ('tm_' + Date.now()) };
@@ -103,11 +115,25 @@ router.delete('/:id', protect, async (req, res) => {
     if (getIsConnected()) {
       if (id && mongoose.Types.ObjectId.isValid(id)) {
         await TeamMember.findByIdAndDelete(id);
-      } else {
-        await TeamMember.findOneAndDelete({ _id: id }).catch(() => {});
+      } else if (typeof id === 'string' && id.startsWith('tm_')) {
+        const numIdx = parseInt(id.replace('tm_', ''), 10) - 1;
+        if (!isNaN(numIdx) && numIdx >= 0) {
+          const allDocs = await TeamMember.find().sort({ order: 1, _id: 1 });
+          if (allDocs[numIdx]) {
+            await TeamMember.findByIdAndDelete(allDocs[numIdx]._id);
+          }
+        }
       }
     }
-    memoryTeam = memoryTeam.filter(t => t._id !== id);
+
+    let memoryIdx = memoryTeam.findIndex(t => t._id === id);
+    if (memoryIdx === -1 && typeof id === 'string' && id.startsWith('tm_')) {
+      const numIdx = parseInt(id.replace('tm_', ''), 10) - 1;
+      if (numIdx >= 0 && numIdx < memoryTeam.length) memoryIdx = numIdx;
+    }
+    if (memoryIdx !== -1) {
+      memoryTeam.splice(memoryIdx, 1);
+    }
     res.json({ message: 'Team member deleted successfully' });
   } catch (err) {
     console.error('[TEAM DELETE ERROR]', err);
