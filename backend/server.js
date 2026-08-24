@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectDB } from './config/db.js';
+import { connectDB, getIsConnected } from './config/db.js';
 
 import servicesRouter from './routes/services.js';
 import teamRouter from './routes/team.js';
@@ -16,8 +16,13 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Connect Database
-connectDB();
+// Connect DB middleware for every request
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+  } catch (e) {}
+  next();
+});
 
 // Middleware
 app.use(cors());
@@ -28,6 +33,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.get(['/api/health', '/health'], (req, res) => {
   res.json({
     status: 'online',
+    dbConnected: getIsConnected(),
     studio: 'Qorvex Backend REST API',
     timestamp: new Date().toISOString()
   });

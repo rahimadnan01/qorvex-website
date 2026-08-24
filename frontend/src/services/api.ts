@@ -233,6 +233,23 @@ async function fetchAPI<T>(endpoint: string, options: RequestInit = {}, fallback
   }
 }
 
+// Health Check API
+export interface HealthStatus {
+  status: string;
+  dbConnected: boolean;
+  studio: string;
+  timestamp: string;
+}
+
+export const checkHealth = (): Promise<HealthStatus> =>
+  fetchAPI<HealthStatus>('/health', undefined, {
+    status: 'offline',
+    dbConnected: false,
+    studio: 'Qorvex Backend',
+    timestamp: new Date().toISOString()
+  });
+
+
 // Auth API
 export interface AdminUser {
   _id: string;

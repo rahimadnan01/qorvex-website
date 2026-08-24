@@ -12,7 +12,7 @@ import {
   getProjects, createProject, updateProject, deleteProject,
   getTestimonials, createTestimonial, updateTestimonial, deleteTestimonial,
   loginAdmin, getAdminProfile, logoutAdmin, getStoredAdminUser, AdminUser,
-  uploadImage
+  uploadImage, checkHealth
 } from '../../services/api';
 import { Service, TeamMember, Project, Testimonial } from '../../types';
 
@@ -86,9 +86,14 @@ export default function AdminDashboard() {
     }
   };
 
+  const [dbConnected, setDbConnected] = useState<boolean>(false);
+
   const loadAllData = async () => {
     setLoading(true);
     try {
+      const health = await checkHealth().catch(() => ({ dbConnected: false }));
+      setDbConnected(!!health?.dbConnected);
+
       const [sData, tData, pData, testData] = await Promise.all([
         getServices(), getTeam(), getProjects(), getTestimonials()
       ]);
@@ -436,6 +441,16 @@ export default function AdminDashboard() {
                 </>
               )}
             </button>
+
+            {/* Database Connection Status Pill */}
+            <div className={`px-3.5 py-2 rounded-xl border text-xs font-mono flex items-center gap-2 shadow-sm ${
+              dbConnected
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400'
+            }`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${dbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+              <span className="font-bold">{dbConnected ? 'MongoDB Connected' : 'Memory Cache Mode'}</span>
+            </div>
 
             {/* Authenticated Admin Profile Pill */}
             {currentUser && (
