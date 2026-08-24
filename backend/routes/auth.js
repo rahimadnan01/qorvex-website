@@ -22,7 +22,6 @@ const FALLBACK_ADMIN = {
   id: 'usr_admin_fallback',
   name: 'Qorvex Studio Admin',
   email: DEFAULT_EMAIL,
-  passwordHash: bcrypt.hashSync(DEFAULT_PASSWORD, 10),
   role: 'admin'
 };
 
@@ -45,27 +44,26 @@ router.post('/login', async (req, res) => {
       // Auto-create default admin user in MongoDB Atlas if missing
       if (!user && cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASSWORD) {
         console.log('[AUTH] Auto-seeding default admin user in MongoDB Atlas...');
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, salt);
         user = new User({
           name: 'Qorvex Studio Admin',
           email: DEFAULT_EMAIL,
-          password: hashedPassword,
+          password: DEFAULT_PASSWORD, // pre('save') hook will hash this once
           role: 'admin'
         });
         await user.save();
       }
 
       if (user) {
-        const isMatch = await user.matchPassword(password);
-        if (isMatch || (cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASSWORD)) {
-          // If default admin password needed update, sync it
-          if (!isMatch && cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASSWORD) {
-            const salt = await bcrypt.genSalt(10);
-            user.password = await bcrypt.hash(DEFAULT_PASSWORD, salt);
-            await user.save();
-          }
+        let isMatch = await user.matchPassword(password);
+        
+        // If password failed because of double-hashing legacy issue, sync it
+        if (!isMatch && cleanEmail === DEFAULT_EMAIL && password === DEFAULT_PASSWORD) {
+          user.password = DEFAULT_PASSWORD; // pre('save') hook will re-hash properly
+          await user.save();
+          isMatch = true;
+        }
 
+        if (isMatch) {
           return res.json({
             _id: user._id,
             name: user.name,
